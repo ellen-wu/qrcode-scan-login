@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>扫码登录测试</title>
+
+    <script type="text/javascript" src="./static/js/jquery.min.js"></script>
+    <style type="text/css">
+        a {
+            text-decoration:none;
+        }
+        a:hover {
+            cursor: pointer;
+        }
+        .login-box {
+            padding-top: 50px;
+            width: 600px;
+            margin: 0 auto;
+            text-align: center;
+        }
+        #make-qrcode {
+            padding: 6px 20px;
+            background-color: #4e6ef2;
+            color: #fff;
+        }
+
+        #qrcode-for-login {
+            margin-top: 20px;
+        }
+
+        #show-user-id {
+            margin-top: 20px;
+            color: #ff0000;
+            font-size: 26px;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-box">
+        <div>
+            <a id="make-qrcode" data-ping="qrlogin.php" data-url="qrlogin.php" data-refresh="1" href="javascript:void(0);" title="点击显示或刷新登录二维码">二维码登录</a>
+        </div>
+
+        <div id="show-user-id" style="display: none;"></div>
+
+        <div id="show-refresh-tips" style="display: none;margin-top: 20px;">
+            二维码已过期，<a id="refresh-qrcode" href="javascript:void(0);">刷新二维码</a>
+        </div>
+
+        <div id="qrcode-for-login">
+            <img id="login-qrcode" src="" />
+        </div>
+    </div>
+</body>
+</html>
+<script type="text/javascript">
+    var checkIdString = '';
+
+    function showQrcode() {
+        if ($("#make-qrcode").attr("data-refresh") == "0") {
+            return;
+        }
+        $.post("qrlogin.php", {type: 'make_qrcode'}, function (res) {
+            if (res.code == 200) {
+                $("#login-qrcode").attr("src", res.data.url);
+                checkIdString = res.data.check_id;
+                $("#make-qrcode").attr("data-refresh", 0);
+                loginPing();
+
+                $("#show-refresh-tips").hide();
+            }
+        }, 'json');
+    }
+    $("#make-qrcode").on("click", function () {
+        showQrcode();
+    });
+
+    $("#refresh-qrcode").on("click", function () {
+        showQrcode();
+    });
+
+    // 轮询检查用户是否登录
+    function loginPing() {
+        setTimeout(function() {
+            $.post($("#make-qrcode").attr("data-ping"), {type: 'check_login', check_id: checkIdString}, function(res) {
+                if (res.code == 500) {
+                    alert(res.msg);
+                    return false;
+                } else if (res.code == -202) {
+                    // 二维码过期
+                    $("#show-refresh-tips").show();
+                    $("#login-qrcode").attr('src', '');
+                    $("#make-qrcode").attr("data-refresh", 1);
+                    return false;
+                } else if (res.code == 1) {
+                    setTimeout(function () {
+                        loginPing();
+                    }, 1000);
+                } else if (res.code == 200) {
+                    $("#show-user-id").html("登录的用户id为：" + res.data.user_id);
+                    $("#show-user-id").show();
+                    alert(res.msg);
+
+                    setTimeout(function () {
+                        window.location.href = window.location.href;
+                    }, 5000);
+                }
+            }, 'json');
+        }, 1250);
+
+        console.log('ping');
+    }
+</script>
